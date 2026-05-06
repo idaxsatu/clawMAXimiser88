@@ -808,3 +808,48 @@ def cmd_selfcheck(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="clawMAXimiser88",
+        formatter_class=argparse.RawTextHelpFormatter,
+        description=(
+            "clawMAXimiser88 — local EVM companion app\n\n"
+            "Examples:\n"
+            "  python clawMAXimiser88.py status --rpc https://...\n"
+            "  python clawMAXimiser88.py serve --rpc https://... --allow-rpc-proxy\n"
+            "  python clawMAXimiser88.py rpc --method eth_chainId\n"
+        ),
+    )
+    p.add_argument("--rpc", default=env("CLAW_RPC", "http://127.0.0.1:8545"), help="JSON-RPC URL")
+    p.add_argument("--timeout", type=float, default=float(env("CLAW_TIMEOUT", "18")), help="RPC timeout seconds")
+    sub = p.add_subparsers(dest="cmd", required=True)
+
+    sp = sub.add_parser("status", help="show RPC connectivity + anchors")
+    sp.set_defaults(func=cmd_status)
+
+    sp = sub.add_parser("rpc", help="run an arbitrary JSON-RPC call")
+    sp.add_argument("--method", required=True, help="rpc method name")
+    sp.add_argument("--params", default="[]", help='params as JSON list (default "[]")')
+    sp.set_defaults(func=cmd_rpc)
+
+    sp = sub.add_parser("codehash", help="fetch contract code and sha256 it")
+    sp.add_argument("--address", required=True, help="0x address")
+    sp.add_argument("--block", default="latest", help="block tag (latest, pending, or hex)")
+    sp.set_defaults(func=cmd_codehash)
+
+    sp = sub.add_parser("balance", help="get ETH balance for an address")
+    sp.add_argument("--address", required=True, help="0x address")
+    sp.add_argument("--block", default="latest", help="block tag (latest, pending, or hex)")
+    sp.set_defaults(func=cmd_balance)
+
+    sp = sub.add_parser("logs", help="scan logs for a range")
+    sp.add_argument("--from-block", required=True, help="start block number (int or hex)")
+    sp.add_argument("--to-block", required=True, help="end block number (int or hex)")
+    sp.add_argument("--address", default=None, help="optional contract address filter")
+    sp.add_argument("--topics", default=None, help='optional topics JSON list, e.g. ["0x..."]')
+    sp.set_defaults(func=cmd_logs)
+
+    sp = sub.add_parser("vault-math", help="share/asset math helpers")
+    sp.add_argument("--total-supply", type=int, required=True)
+    sp.add_argument("--total-assets", type=int, required=True)
+    sp.add_argument("--fee-bps", type=int, default=35)
+    sp.add_argument("--mode", choices=["sharesFromAssets", "assetsFromShares", "explainWithdraw"], required=True)
+    sp.add_argument("--amount", type=int, required=True, help="assets or shares (depends on mode)")
+    sp.set_defaults(func=cmd_vault_math)
