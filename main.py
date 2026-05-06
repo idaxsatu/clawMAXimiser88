@@ -583,3 +583,48 @@ class ApiHandler(http.server.BaseHTTPRequestHandler):
             resp = self.rpc.call(method, params)
             if not resp.ok:
                 _json_response(self, 502, {"ok": False, "error": resp.error, "status": resp.status, "raw": resp.raw}, headers=self._cors())
+            else:
+                _json_response(self, 200, {"ok": True, "result": resp.result, "raw": resp.raw, "elapsedMs": resp.elapsed_ms}, headers=self._cors())
+            return
+
+        if path == "/api/vault-math":
+            raw = _read_body(self, self.cfg.max_body_bytes)
+            obj = json.loads(raw.decode("utf-8") if raw else "{}")
+            st = VaultState(
+                total_supply=int(obj.get("totalSupply", 0)),
+                total_assets=int(obj.get("totalAssets", 0)),
+                fee_bps=int(obj.get("feeBps", 0)),
+            )
+            shares = int(obj.get("shares", 0))
+            if shares <= 0:
+                raise AppError("shares must be > 0")
+            res = explain_withdraw(shares, st)
+            _json_response(self, 200, {"ok": True, "explainWithdraw": res}, headers=self._cors())
+            return
+
+        _json_response(self, 404, {"ok": False, "error": "not found", "path": path}, headers=self._cors())
+
+    def _handle_delete(self) -> None:
+        path = urllib.parse.urlparse(self.path).path
+        if path.startswith("/api/notes/"):
+            note_id = path.split("/api/notes/", 1)[1]
+            ok = self.store.delete_note(note_id)
+            _json_response(self, 200, {"ok": ok}, headers=self._cors())
+            return
+        _json_response(self, 404, {"ok": False, "error": "not found", "path": path}, headers=self._cors())
+
+
+def run_server(cfg: ServerConfig) -> None:
+    rpc = JsonRpcClient(cfg.rpc_url, timeout_s=18.0)
+    store = JsonStore(cfg.store_path)
+
+    class _ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+        daemon_threads = True
+
+    httpd = _ThreadingHTTPServer((cfg.host, cfg.port), ApiHandler)
+    setattr(httpd, "cfg", cfg)
+    setattr(httpd, "rpc", rpc)
+    setattr(httpd, "store", store)
+
+    print(f"[clawMAXimiser88] serving on http://{cfg.host}:{cfg.port}")
+    print(f"[clawMAXimiser88] rpc: {cfg.rpc_url}")
