@@ -853,3 +853,33 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--mode", choices=["sharesFromAssets", "assetsFromShares", "explainWithdraw"], required=True)
     sp.add_argument("--amount", type=int, required=True, help="assets or shares (depends on mode)")
     sp.set_defaults(func=cmd_vault_math)
+
+    sp = sub.add_parser("serve", help="run local API for ClawVisionMAX")
+    sp.add_argument("--host", default="127.0.0.1")
+    sp.add_argument("--port", type=int, default=int(env("CLAW_PORT", "8787")))
+    sp.add_argument("--data-dir", default=os.path.join(os.path.expanduser("~"), ".clawMAXimiser88"))
+    sp.add_argument("--allow-rpc-proxy", action="store_true", help="enable /api/rpc-proxy endpoint")
+    sp.add_argument("--max-body-bytes", type=int, default=512 * 1024)
+    sp.set_defaults(func=cmd_serve)
+
+    sp = sub.add_parser("selfcheck", help="offline internal checks")
+    sp.set_defaults(func=cmd_selfcheck)
+
+    return p
+
+
+def main(argv: list[str]) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:
+        return int(args.func(args))
+    except AppError as e:
+        sys.stderr.write(f"[clawMAXimiser88] error: {e}\n")
+        return 2
+    except KeyboardInterrupt:
+        sys.stderr.write("\n[clawMAXimiser88] interrupted\n")
+        return 130
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))
