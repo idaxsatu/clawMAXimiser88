@@ -88,3 +88,48 @@ def is_hex(s: str) -> bool:
     return bool(re.fullmatch(r"0x[0-9a-fA-F]*", s or ""))
 
 
+def to_int_hex(n: int) -> str:
+    if n < 0:
+        raise AppError("negative integer not allowed for hex encoding")
+    return hex(n)
+
+
+def parse_int_auto(s: str) -> int:
+    s = s.strip()
+    if s.lower().startswith("0x"):
+        return int(s, 16)
+    return int(s, 10)
+
+
+def ensure_dir(p: str) -> None:
+    os.makedirs(p, exist_ok=True)
+
+
+def short_id(prefix: str = "claw") -> str:
+    return f"{prefix}-{uuid.uuid4().hex[:12]}"
+
+
+def stable_hash(text: str) -> str:
+    h = hashlib.sha256(text.encode("utf-8")).digest()
+    return "sha256:" + base64.urlsafe_b64encode(h).decode("ascii").rstrip("=")
+
+
+def human_bytes(n: int) -> str:
+    if n < 0:
+        return f"{n} B"
+    units = ["B", "KB", "MB", "GB", "TB"]
+    x = float(n)
+    i = 0
+    while x >= 1024.0 and i < len(units) - 1:
+        x /= 1024.0
+        i += 1
+    if i == 0:
+        return f"{int(x)} {units[i]}"
+    return f"{x:.2f} {units[i]}"
+
+
+def wrap(s: str, width: int = 92) -> str:
+    return "\n".join(textwrap.wrap(s, width=width, replace_whitespace=False))
+
+
+def jitter(ms: int, spread: int = 40) -> None:
