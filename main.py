@@ -403,3 +403,48 @@ def explain_withdraw(shares: int, st: VaultState) -> dict:
 
 @dataclasses.dataclass
 class ServerConfig:
+    host: str
+    port: int
+    rpc_url: str
+    allow_rpc_proxy: bool
+    store_path: str
+    max_body_bytes: int = 512 * 1024
+
+
+def _json_response(handler: http.server.BaseHTTPRequestHandler, status: int, obj: t.Any, headers: t.Optional[dict] = None) -> None:
+    data = json_dumps(obj, pretty=True).encode("utf-8")
+    handler.send_response(status)
+    handler.send_header("Content-Type", "application/json; charset=utf-8")
+    handler.send_header("Content-Length", str(len(data)))
+    handler.send_header("Cache-Control", "no-store")
+    if headers:
+        for k, v in headers.items():
+            handler.send_header(k, v)
+    handler.end_headers()
+    handler.wfile.write(data)
+
+
+def _text_response(handler: http.server.BaseHTTPRequestHandler, status: int, text: str, content_type: str = "text/plain; charset=utf-8") -> None:
+    b = text.encode("utf-8")
+    handler.send_response(status)
+    handler.send_header("Content-Type", content_type)
+    handler.send_header("Content-Length", str(len(b)))
+    handler.send_header("Cache-Control", "no-store")
+    handler.end_headers()
+    handler.wfile.write(b)
+
+
+def _read_body(handler: http.server.BaseHTTPRequestHandler, max_bytes: int) -> bytes:
+    cl = handler.headers.get("Content-Length")
+    if cl is None:
+        return b""
+    try:
+        n = int(cl)
+    except Exception:
+        raise AppError("invalid Content-Length")
+    if n < 0 or n > max_bytes:
+        raise AppError("request body too large")
+    return handler.rfile.read(n)
+
+
+class ApiHandler(http.server.BaseHTTPRequestHandler):
