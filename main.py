@@ -223,3 +223,48 @@ class JsonRpcClient:
 
     def gas_price(self) -> int:
         r = self.call("eth_gasPrice", [])
+        if not r.ok or not isinstance(r.result, str) or not is_hex(r.result):
+            raise AppError(f"eth_gasPrice failed: {r.error}")
+        return int(r.result, 16)
+
+    def get_balance(self, addr: str, block: str = "latest") -> int:
+        r = self.call("eth_getBalance", [addr, block])
+        if not r.ok or not isinstance(r.result, str) or not is_hex(r.result):
+            raise AppError(f"eth_getBalance failed: {r.error}")
+        return int(r.result, 16)
+
+    def get_code(self, addr: str, block: str = "latest") -> bytes:
+        r = self.call("eth_getCode", [addr, block])
+        if not r.ok or not isinstance(r.result, str) or not is_hex(r.result):
+            raise AppError(f"eth_getCode failed: {r.error}")
+        hx = r.result[2:]
+        if hx == "":
+            return b""
+        return bytes.fromhex(hx)
+
+    def call_eth_call(self, to: str, data_hex: str, block: str = "latest") -> str:
+        if not is_hex(data_hex):
+            raise AppError("data must be hex (0x...)")
+        r = self.call("eth_call", [{"to": to, "data": data_hex}, block])
+        if not r.ok or not isinstance(r.result, str) or not is_hex(r.result):
+            raise AppError(f"eth_call failed: {r.error}")
+        return r.result
+
+    def get_logs(self, from_block: int, to_block: int, address: t.Optional[str] = None, topics: t.Optional[list] = None) -> list:
+        if from_block < 0 or to_block < 0:
+            raise AppError("negative block range")
+        if to_block < from_block:
+            raise AppError("to_block must be >= from_block")
+        flt: dict = {"fromBlock": to_int_hex(from_block), "toBlock": to_int_hex(to_block)}
+        if address:
+            flt["address"] = address
+        if topics is not None:
+            flt["topics"] = topics
+        r = self.call("eth_getLogs", [flt])
+        if not r.ok or not isinstance(r.result, list):
+            raise AppError(f"eth_getLogs failed: {r.error}")
+        return r.result
+
+
+# =============================================================
+# Local storage (tiny json db)
