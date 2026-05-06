@@ -718,3 +718,48 @@ def cmd_codehash(args: argparse.Namespace) -> int:
     print_kv(pairs)
     return 0
 
+
+def cmd_balance(args: argparse.Namespace) -> int:
+    rpc = JsonRpcClient(args.rpc, timeout_s=args.timeout)
+    wei = rpc.get_balance(args.address, block=args.block)
+    eth = wei / 1e18
+    print_kv([
+        ("address", args.address),
+        ("block", args.block),
+        ("wei", wei),
+        ("eth", f"{eth:.18f}"),
+    ])
+    return 0
+
+
+def cmd_logs(args: argparse.Namespace) -> int:
+    rpc = JsonRpcClient(args.rpc, timeout_s=args.timeout)
+    f = parse_int_auto(args.from_block)
+    tblock = parse_int_auto(args.to_block)
+    addr = args.address
+    topics = json.loads(args.topics) if args.topics else None
+    logs = rpc.get_logs(f, tblock, address=addr, topics=topics)
+    out = {"ok": True, "count": len(logs), "from": f, "to": tblock, "address": addr, "topics": topics, "logs": logs}
+    print(json_dumps(out, pretty=True))
+    return 0
+
+
+def cmd_vault_math(args: argparse.Namespace) -> int:
+    st = VaultState(total_supply=args.total_supply, total_assets=args.total_assets, fee_bps=args.fee_bps)
+    if args.mode == "sharesFromAssets":
+        shares = convert_to_shares(args.amount, st)
+        print_kv([("assets", args.amount), ("shares", shares)])
+        return 0
+    if args.mode == "assetsFromShares":
+        assets = convert_to_assets(args.amount, st)
+        print_kv([("shares", args.amount), ("assets", assets)])
+        return 0
+    if args.mode == "explainWithdraw":
+        res = explain_withdraw(args.amount, st)
+        print(json_dumps(res, pretty=True))
+        return 0
+    raise AppError("unknown vault math mode")
+
+
+def cmd_serve(args: argparse.Namespace) -> int:
+    store_dir = args.data_dir
