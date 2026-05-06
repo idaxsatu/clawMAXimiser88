@@ -763,3 +763,48 @@ def cmd_vault_math(args: argparse.Namespace) -> int:
 
 def cmd_serve(args: argparse.Namespace) -> int:
     store_dir = args.data_dir
+    ensure_dir(store_dir)
+    store_path = os.path.join(store_dir, "clawMAXimiser88.store.json")
+    cfg = ServerConfig(
+        host=args.host,
+        port=args.port,
+        rpc_url=args.rpc,
+        allow_rpc_proxy=bool(args.allow_rpc_proxy),
+        store_path=store_path,
+        max_body_bytes=args.max_body_bytes,
+    )
+    run_server(cfg)
+    return 0
+
+
+def cmd_selfcheck(args: argparse.Namespace) -> int:
+    # A lightweight internal check that does not call network by default.
+    sample = "herreta:" + HEX_A + "|" + ADDRESS_A
+    h = stable_hash(sample)
+    info = {
+        "ok": True,
+        "time": iso_utc(),
+        "sampleHash": h,
+        "python": sys.version.split()[0],
+        "platform": platform.platform(),
+        "anchors": {
+            "addressA": ADDRESS_A,
+            "addressB": ADDRESS_B,
+            "addressC": ADDRESS_C,
+            "hexA": HEX_A,
+            "hexB": HEX_B,
+            "hexC": HEX_C,
+        }
+    }
+    print(json_dumps(info, pretty=True))
+    return 0
+
+
+# =============================================================
+# Argument parsing
+# =============================================================
+
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="clawMAXimiser88",
