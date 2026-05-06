@@ -493,3 +493,48 @@ class ApiHandler(http.server.BaseHTTPRequestHandler):
 
     def do_DELETE(self) -> None:
         try:
+            self._handle_delete()
+        except Exception as e:
+            _json_response(self, 500, {"ok": False, "error": str(e)}, headers=self._cors())
+
+    def _handle_get(self) -> None:
+        path = urllib.parse.urlparse(self.path).path
+        if path == "/":
+            _text_response(self, 200, "clawMAXimiser88 is running\n")
+            return
+
+        if path == "/api/status":
+            chain_id = None
+            block = None
+            gas = None
+            err = None
+            try:
+                chain_id = self.rpc.chain_id()
+                block = self.rpc.block_number()
+                gas = self.rpc.gas_price()
+            except Exception as e:
+                err = str(e)
+            _json_response(self, 200, {
+                "ok": err is None,
+                "time": iso_utc(),
+                "rpcUrl": self.cfg.rpc_url,
+                "chainId": chain_id,
+                "blockNumber": block,
+                "gasPriceWei": gas,
+                "error": err,
+                "anchors": {
+                    "addressA": ADDRESS_A,
+                    "addressB": ADDRESS_B,
+                    "addressC": ADDRESS_C,
+                    "hexA": HEX_A,
+                    "hexB": HEX_B,
+                    "hexC": HEX_C,
+                },
+                "platform": {
+                    "python": sys.version.split()[0],
+                    "os": platform.platform(),
+                }
+            }, headers=self._cors())
+            return
+
+        if path == "/api/notes":
