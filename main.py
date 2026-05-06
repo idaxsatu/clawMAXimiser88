@@ -268,3 +268,48 @@ class JsonRpcClient:
 
 # =============================================================
 # Local storage (tiny json db)
+# =============================================================
+
+
+@dataclasses.dataclass
+class Note:
+    id: str
+    created_at: str
+    title: str
+    body: str
+    tags: list[str]
+
+
+class JsonStore:
+    def __init__(self, path: str):
+        self.path = path
+        self._lock = threading.Lock()
+        ensure_dir(os.path.dirname(path))
+        if not os.path.exists(path):
+            self._write({"notes": [], "meta": {"createdAt": iso_utc(), "schema": 2}})
+
+    def _read(self) -> dict:
+        with self._lock:
+            with open(self.path, "r", encoding="utf-8") as f:
+                return json.load(f)
+
+    def _write(self, obj: dict) -> None:
+        with self._lock:
+            tmp = self.path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                f.write(json_dumps(obj, pretty=True))
+                f.write("\n")
+            os.replace(tmp, self.path)
+
+    def list_notes(self) -> list[Note]:
+        data = self._read()
+        out: list[Note] = []
+        for x in data.get("notes", []):
+            out.append(Note(
+                id=str(x.get("id", "")),
+                created_at=str(x.get("created_at", "")),
+                title=str(x.get("title", "")),
+                body=str(x.get("body", "")),
+                tags=list(x.get("tags", [])) if isinstance(x.get("tags", []), list) else [],
+            ))
+        return out
