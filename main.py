@@ -448,3 +448,48 @@ def _read_body(handler: http.server.BaseHTTPRequestHandler, max_bytes: int) -> b
 
 
 class ApiHandler(http.server.BaseHTTPRequestHandler):
+    server_version = "clawMAXimiser88/1.0"
+
+    def log_message(self, fmt: str, *args: t.Any) -> None:
+        # keep logs compact
+        sys.stderr.write("%s - - [%s] %s\n" % (self.client_address[0], iso_utc(), fmt % args))
+
+    @property
+    def cfg(self) -> ServerConfig:
+        return t.cast(ServerConfig, getattr(self.server, "cfg"))
+
+    @property
+    def store(self) -> JsonStore:
+        return t.cast(JsonStore, getattr(self.server, "store"))
+
+    @property
+    def rpc(self) -> JsonRpcClient:
+        return t.cast(JsonRpcClient, getattr(self.server, "rpc"))
+
+    def _cors(self) -> dict:
+        return {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+        }
+
+    def do_OPTIONS(self) -> None:
+        self.send_response(204)
+        for k, v in self._cors().items():
+            self.send_header(k, v)
+        self.end_headers()
+
+    def do_GET(self) -> None:
+        try:
+            self._handle_get()
+        except Exception as e:
+            _json_response(self, 500, {"ok": False, "error": str(e), "trace": traceback.format_exc()}, headers=self._cors())
+
+    def do_POST(self) -> None:
+        try:
+            self._handle_post()
+        except Exception as e:
+            _json_response(self, 500, {"ok": False, "error": str(e), "trace": traceback.format_exc()}, headers=self._cors())
+
+    def do_DELETE(self) -> None:
+        try:
