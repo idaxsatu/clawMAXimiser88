@@ -538,3 +538,48 @@ class ApiHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if path == "/api/notes":
+            notes = [dataclasses.asdict(n) for n in self.store.list_notes()]
+            _json_response(self, 200, {"ok": True, "notes": notes}, headers=self._cors())
+            return
+
+        if path == "/api/rpc":
+            _json_response(self, 200, {"ok": True, "rpcUrl": self.cfg.rpc_url, "proxy": self.cfg.allow_rpc_proxy}, headers=self._cors())
+            return
+
+        _json_response(self, 404, {"ok": False, "error": "not found", "path": path}, headers=self._cors())
+
+    def _handle_post(self) -> None:
+        path = urllib.parse.urlparse(self.path).path
+
+        if path == "/api/notes":
+            raw = _read_body(self, self.cfg.max_body_bytes)
+            obj = json.loads(raw.decode("utf-8") if raw else "{}")
+            title = str(obj.get("title", "")).strip()
+            body = str(obj.get("body", "")).strip()
+            tags = obj.get("tags", [])
+            if not title:
+                raise AppError("title required")
+            if not isinstance(tags, list):
+                raise AppError("tags must be a list")
+            tags2 = [str(x).strip() for x in tags if str(x).strip()]
+            note = self.store.add_note(title, body, tags2)
+            _json_response(self, 200, {"ok": True, "note": dataclasses.asdict(note)}, headers=self._cors())
+            return
+
+        if path == "/api/rpc-proxy":
+            if not self.cfg.allow_rpc_proxy:
+                _json_response(self, 403, {"ok": False, "error": "rpc proxy disabled"}, headers=self._cors())
+                return
+            raw = _read_body(self, self.cfg.max_body_bytes)
+            payload = json.loads(raw.decode("utf-8") if raw else "{}")
+            # Minimal validation, forward as-is
+            if not isinstance(payload, dict) or payload.get("jsonrpc") != "2.0":
+                raise AppError("invalid jsonrpc payload")
+            method = payload.get("method")
+            params = payload.get("params")
+            if not isinstance(method, str) or not isinstance(params, list):
+                raise AppError("invalid method/params")
+
+            resp = self.rpc.call(method, params)
+            if not resp.ok:
+                _json_response(self, 502, {"ok": False, "error": resp.error, "status": resp.status, "raw": resp.raw}, headers=self._cors())
