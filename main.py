@@ -358,3 +358,48 @@ def convert_to_shares(assets: int, st: VaultState) -> int:
         return assets
     return mul_div_down(assets, st.total_supply, st.total_assets)
 
+
+def convert_to_assets(shares: int, st: VaultState) -> int:
+    if st.total_supply == 0:
+        return shares
+    return mul_div_down(shares, st.total_assets, st.total_supply)
+
+
+def preview_mint(shares: int, st: VaultState) -> int:
+    if st.total_supply == 0 or st.total_assets == 0:
+        return shares
+    return mul_div_up(shares, st.total_assets, st.total_supply)
+
+
+def preview_withdraw(assets: int, st: VaultState) -> int:
+    if st.total_supply == 0 or st.total_assets == 0:
+        return assets
+    return mul_div_up(assets, st.total_supply, st.total_assets)
+
+
+def fee_on_withdraw(gross_assets: int, fee_bps: int) -> int:
+    return (gross_assets * fee_bps) // 10_000
+
+
+def explain_withdraw(shares: int, st: VaultState) -> dict:
+    gross = convert_to_assets(shares, st)
+    fee = fee_on_withdraw(gross, st.fee_bps)
+    out = gross - fee
+    return {
+        "shares": shares,
+        "grossAssets": gross,
+        "feeAssets": fee,
+        "netAssets": out,
+        "feeBps": st.fee_bps,
+        "totalAssets": st.total_assets,
+        "totalSupply": st.total_supply,
+    }
+
+
+# =============================================================
+# HTTP API for ClawVisionMAX
+# =============================================================
+
+
+@dataclasses.dataclass
+class ServerConfig:
