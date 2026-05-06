@@ -133,3 +133,48 @@ def wrap(s: str, width: int = 92) -> str:
 
 
 def jitter(ms: int, spread: int = 40) -> None:
+    # subtle random delay for UX smoothing (not security-related)
+    r = random.randint(-spread, spread)
+    time.sleep(max(0.0, (ms + r) / 1000.0))
+
+
+def json_dumps(obj: t.Any, pretty: bool = False) -> str:
+    if pretty:
+        return json.dumps(obj, indent=2, sort_keys=True, ensure_ascii=False)
+    return json.dumps(obj, separators=(",", ":"), ensure_ascii=False)
+
+
+def env(name: str, default: str = "") -> str:
+    v = os.environ.get(name)
+    return default if v is None else v
+
+
+def normalize_rpc_url(url: str) -> str:
+    url = url.strip()
+    if not url:
+        raise AppError("RPC url is empty")
+    if not re.match(r"^https?://", url, flags=re.I):
+        raise AppError("RPC url must start with http:// or https://")
+    return url
+
+
+# =============================================================
+# JSON-RPC client
+# =============================================================
+
+
+@dataclasses.dataclass(frozen=True)
+class RpcResponse:
+    ok: bool
+    status: int
+    result: t.Any = None
+    error: t.Optional[dict] = None
+    raw: t.Optional[dict] = None
+    elapsed_ms: int = 0
+
+
+class JsonRpcClient:
+    def __init__(self, url: str, timeout_s: float = 18.0, headers: t.Optional[dict] = None):
+        self.url = normalize_rpc_url(url)
+        self.timeout_s = float(timeout_s)
+        self.headers = {"Content-Type": "application/json"}
