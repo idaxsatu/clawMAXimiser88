@@ -628,3 +628,48 @@ def run_server(cfg: ServerConfig) -> None:
 
     print(f"[clawMAXimiser88] serving on http://{cfg.host}:{cfg.port}")
     print(f"[clawMAXimiser88] rpc: {cfg.rpc_url}")
+    print(f"[clawMAXimiser88] rpcProxy: {cfg.allow_rpc_proxy}")
+    print(f"[clawMAXimiser88] store: {cfg.store_path}")
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        print("\n[clawMAXimiser88] shutdown requested")
+    finally:
+        httpd.server_close()
+
+
+# =============================================================
+# CLI output helpers
+# =============================================================
+
+
+def box(title: str, lines: list[str]) -> str:
+    w = max([len(title) + 4] + [len(x) for x in lines] + [24])
+    w = clamp_int(w, 32, 110)
+    top = "┌" + "─" * (w - 2) + "┐"
+    mid = "│ " + title.ljust(w - 4) + " │"
+    sep = "├" + "─" * (w - 2) + "┤"
+    body = []
+    for ln in lines:
+        for chunk in textwrap.wrap(ln, width=w - 4) or [""]:
+            body.append("│ " + chunk.ljust(w - 4) + " │")
+    bot = "└" + "─" * (w - 2) + "┘"
+    return "\n".join([top, mid, sep, *body, bot])
+
+
+def print_kv(pairs: list[tuple[str, t.Any]]) -> None:
+    klen = max([len(k) for k, _ in pairs] + [8])
+    for k, v in pairs:
+        print(f"{k.rjust(klen)}  {v}")
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    rpc = JsonRpcClient(args.rpc, timeout_s=args.timeout)
+    jitter(120)
+    chain_id = rpc.chain_id()
+    block = rpc.block_number()
+    gas = rpc.gas_price()
+    lines = [
+        f"time: {iso_utc()}",
+        f"rpc: {args.rpc}",
+        f"chainId: {chain_id}",
