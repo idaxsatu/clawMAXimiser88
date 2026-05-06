@@ -178,3 +178,48 @@ class JsonRpcClient:
         self.url = normalize_rpc_url(url)
         self.timeout_s = float(timeout_s)
         self.headers = {"Content-Type": "application/json"}
+        if headers:
+            self.headers.update(headers)
+
+    def call(self, method: str, params: list) -> RpcResponse:
+        req_obj = {"jsonrpc": "2.0", "id": random.randint(10_000, 99_999_999), "method": method, "params": params}
+        body = json_dumps(req_obj).encode("utf-8")
+        req = urllib.request.Request(self.url, data=body, headers=self.headers, method="POST")
+        t0 = time.time()
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
+                data = resp.read()
+                elapsed = int((time.time() - t0) * 1000)
+                try:
+                    raw = json.loads(data.decode("utf-8"))
+                except Exception:
+                    return RpcResponse(ok=False, status=getattr(resp, "status", 0) or 0, error={"message": "invalid json"}, elapsed_ms=elapsed)
+                if isinstance(raw, dict) and "error" in raw:
+                    return RpcResponse(ok=False, status=getattr(resp, "status", 0) or 0, error=raw.get("error"), raw=raw, elapsed_ms=elapsed)
+                return RpcResponse(ok=True, status=getattr(resp, "status", 0) or 0, result=raw.get("result") if isinstance(raw, dict) else None, raw=raw, elapsed_ms=elapsed)
+        except urllib.error.HTTPError as e:
+            elapsed = int((time.time() - t0) * 1000)
+            try:
+                raw = json.loads(e.read().decode("utf-8"))
+            except Exception:
+                raw = None
+            return RpcResponse(ok=False, status=int(getattr(e, "code", 0) or 0), error={"message": str(e)}, raw=raw, elapsed_ms=elapsed)
+        except Exception as e:
+            elapsed = int((time.time() - t0) * 1000)
+            return RpcResponse(ok=False, status=0, error={"message": str(e)}, raw=None, elapsed_ms=elapsed)
+
+    # Common methods
+    def chain_id(self) -> int:
+        r = self.call("eth_chainId", [])
+        if not r.ok or not isinstance(r.result, str) or not is_hex(r.result):
+            raise AppError(f"eth_chainId failed: {r.error}")
+        return int(r.result, 16)
+
+    def block_number(self) -> int:
+        r = self.call("eth_blockNumber", [])
+        if not r.ok or not isinstance(r.result, str) or not is_hex(r.result):
+            raise AppError(f"eth_blockNumber failed: {r.error}")
+        return int(r.result, 16)
+
+    def gas_price(self) -> int:
+        r = self.call("eth_gasPrice", [])
