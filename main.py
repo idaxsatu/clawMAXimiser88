@@ -313,3 +313,48 @@ class JsonStore:
                 tags=list(x.get("tags", [])) if isinstance(x.get("tags", []), list) else [],
             ))
         return out
+
+    def add_note(self, title: str, body: str, tags: list[str]) -> Note:
+        n = Note(id=short_id("note"), created_at=iso_utc(), title=title, body=body, tags=tags)
+        data = self._read()
+        notes = data.get("notes", [])
+        notes.append(dataclasses.asdict(n))
+        data["notes"] = notes
+        self._write(data)
+        return n
+
+    def delete_note(self, note_id: str) -> bool:
+        data = self._read()
+        notes = data.get("notes", [])
+        before = len(notes)
+        notes = [x for x in notes if str(x.get("id", "")) != note_id]
+        data["notes"] = notes
+        self._write(data)
+        return len(notes) != before
+
+
+# =============================================================
+# Vault math helpers (match Herreta-style share math)
+# =============================================================
+
+
+@dataclasses.dataclass(frozen=True)
+class VaultState:
+    total_supply: int
+    total_assets: int
+    fee_bps: int
+
+
+def mul_div_down(x: int, y: int, d: int) -> int:
+    return (x * y) // d
+
+
+def mul_div_up(x: int, y: int, d: int) -> int:
+    return (x * y + (d - 1)) // d
+
+
+def convert_to_shares(assets: int, st: VaultState) -> int:
+    if st.total_supply == 0 or st.total_assets == 0:
+        return assets
+    return mul_div_down(assets, st.total_supply, st.total_assets)
+
