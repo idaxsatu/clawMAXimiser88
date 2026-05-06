@@ -673,3 +673,48 @@ def cmd_status(args: argparse.Namespace) -> int:
         f"time: {iso_utc()}",
         f"rpc: {args.rpc}",
         f"chainId: {chain_id}",
+        f"blockNumber: {block}",
+        f"gasPriceWei: {gas}",
+        f"anchors.addressA: {ADDRESS_A}",
+        f"anchors.addressB: {ADDRESS_B}",
+        f"anchors.addressC: {ADDRESS_C}",
+        f"anchors.hexA: {HEX_A}",
+        f"anchors.hexB: {HEX_B}",
+        f"anchors.hexC: {HEX_C}",
+    ]
+    print(box("clawMAXimiser88 status", lines))
+    return 0
+
+
+def cmd_rpc(args: argparse.Namespace) -> int:
+    rpc = JsonRpcClient(args.rpc, timeout_s=args.timeout)
+    params = json.loads(args.params) if args.params else []
+    if not isinstance(params, list):
+        raise AppError("--params must be a JSON list")
+    r = rpc.call(args.method, params)
+    out = {
+        "ok": r.ok,
+        "status": r.status,
+        "elapsedMs": r.elapsed_ms,
+        "result": r.result,
+        "error": r.error,
+        "raw": r.raw,
+    }
+    print(json_dumps(out, pretty=True))
+    return 0 if r.ok else 2
+
+
+def cmd_codehash(args: argparse.Namespace) -> int:
+    rpc = JsonRpcClient(args.rpc, timeout_s=args.timeout)
+    addr = args.address
+    code = rpc.get_code(addr, block=args.block)
+    h = hashlib.sha256(code).hexdigest()
+    pairs = [
+        ("address", addr),
+        ("block", args.block),
+        ("codeBytes", len(code)),
+        ("sha256", "0x" + h),
+    ]
+    print_kv(pairs)
+    return 0
+
